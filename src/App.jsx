@@ -87,13 +87,65 @@ function deltaClass(curr, prev) {
   return "deltaFlat";
 }
 
-function App() {
-  const [ticker, setTicker] = useState("HOOD");
-  const [aiText, setAiText] = useState("");
+const STORAGE_KEY = "eid:snapshots:v1";
 
-  const history = useMemo(() => SNAPSHOTS[ticker] ?? [], [ticker]);
-  const latest = history[0];
-  const previous = history[1];
+function loadStoredSnapshots() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    console.warn("Failed to load snapshots from localStorage:", e);
+    return {};
+  }
+}
+
+function saveStoredSnapshots(all) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  } catch (e) {
+    console.warn("Failed to save snapshots to localStorage:", e);
+  }
+}
+
+/**
+ * Upsert by asOf date and keep newest-first.
+ * Prevents duplicates when you capture the same day again.
+ */
+function upsertSnapshot(list, snap) {
+  const filtered = (list ?? []).filter((s) => s?.asOf !== snap?.asOf);
+  return [snap, ...filtered].sort((a, b) => (a.asOf < b.asOf ? 1 : -1));
+}
+
+function App() {
+    const [ticker, setTicker] = useState("HOOD");
+    const [aiText, setAiText] = useState("");
+    const [stored, setStored] = useState(() => loadStoredSnapshots());
+    const [toast, setToast] = useState("");
+
+    // 1️⃣ base data (demo)
+    const baseHistory = useMemo(() => SNAPSHOTS[ticker] ?? [], [ticker]);
+
+    // 2️⃣ stored data
+    const storedHistory = stored?.[ticker] ?? [];
+
+    // 3️⃣ merge them
+    const history = useMemo(() => {
+        const byDate = new Map();
+        [...storedHistory, ...baseHistory].forEach((s) => {
+        if (s?.asOf) byDate.set(s.asOf, s);
+        });
+        return [...byDate.values()].sort((a, b) =>
+        a.asOf < b.asOf ? 1 : -1
+        );
+    }, [storedHistory, baseHistory]);
+
+    // 4️⃣ NOW define latest & previous
+    const latest = history[0];
+    const previous = history[1];
+
+    // 5️⃣ THEN define latestToShow
+    //const latestToShow = liveLatest ?? latest; // if you have liveLatest, otherwise just use latest
+    const latestToShow = latest;
 
   return (
     <div className="page">
@@ -104,18 +156,69 @@ function App() {
             <p className="subtitle">Structured market snapshots for long-term pattern analysis.</p>
         </div>
 
-        <div className="tickerPicker">
-            <label className="label">Ticker</label>
-            <select
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            className="select"
-            >
-            {TICKERS.map((t) => (
-                <option key={t} value={t}>{t}</option>
-            ))}
-            </select>
-        </div>
+<div className="controlPanel">
+  <div className="controlRow">
+    <div className="controlGroup">
+      <label className="label">Ticker</label>
+      <select
+        value={ticker}
+        onChange={(e) => {
+          setTicker(e.target.value);
+          setAiText("");
+         // setSelectedPrevious?.(null); // safe if you add clickable baseline later
+        }}
+        className="select selectSmall"
+      >
+        {TICKERS.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+      </select>
+    </div>
+
+    <div className="controlGroup">
+      <label className="label">Actions</label>
+      <div className="controlButtons">
+        <button
+          className="btn btnPrimary"
+          onClick={() => {
+            const current = latestToShow ?? latest; // use latestToShow if you have it
+            if (!current) return;
+
+            const nextAll = { ...stored };
+            nextAll[ticker] = upsertSnapshot(nextAll[ticker], {
+              ...current,
+              source: current.source ?? "captured",
+            });
+
+            setStored(nextAll);
+              saveStoredSnapshots(nextAll);
+              
+            setToast(`✅ Captured ${ticker} • ${current.asOf}`);
+            window.setTimeout(() => setToast(""), 1800);
+          }}
+          disabled={!(latestToShow ?? latest)}
+        >
+          Capture
+        </button>
+
+        <button
+          className="btn btnGhost"
+          onClick={() => {
+            const nextAll = { ...stored, [ticker]: [] };
+            setStored(nextAll);
+            saveStoredSnapshots(nextAll);
+            setToast(`Cleared captures for ${ticker}`);
+            window.setTimeout(() => setToast(""), 1600);
+          }}
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {toast ? <div className="toast">{toast}</div> : null}
+</div>
         </header>
 
         <div className="grid">
@@ -216,6 +319,7 @@ function DeltaCard({ latest, previous }) {
   );
 }
 
+
 function HistoryCard({ history }) {
   return (
     <div className="card">
@@ -224,24 +328,31 @@ function HistoryCard({ history }) {
         <span className="muted">{history?.length ?? 0} captures</span>
       </div>
 
-      <div className="history">
-        {(history ?? []).map((s) => (
-          <div key={s.asOf} className="historyRow">
-            <div>
+      <div className="historyCompact">
+        {(history ?? []).map((s) => {
+          const trend = s?.windows?.m3; // <-- use 3 month trend
+          const trendDir = typeof trend === "number" ? (trend >= 0 ? "up" : "down") : "flat";
+          const arrow = trendDir === "up" ? "▲" : trendDir === "down" ? "▼" : "•";
+
+          return (
+            <div key={s.asOf} className="historyLine">
               <div className="historyDate">{s.asOf}</div>
-              <div className="muted small">Price ${s.price.toFixed(2)}</div>
+
+              <div className="historyPrice">${s.price.toFixed(2)}</div>
+
+              <div className={`historyTrend ${trendDir}`}>
+                <span className="arrow">{arrow}</span>
+                <span className="labelSmall">3-mo trend</span>
+                <span className="trendValue">{formatPct(trend)}</span>
+              </div>
             </div>
-            <div className="historyChips">
-              <span className="chip">1M {formatPct(s.windows.m1)}</span>
-              <span className="chip">3M {formatPct(s.windows.m3)}</span>
-              <span className="chip">1Y {formatPct(s.windows.y1)}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
+
 
 function Metric({ label, value }) {
   return (
