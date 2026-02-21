@@ -98,24 +98,24 @@ function App() {
   return (
     <div className="page">
       <div className="container">
-       <header className="header">
-            <div>
-                <h1 className="title">🧠 Equity Intelligence Dashboard</h1>
-                <p className="subtitle">Structured market snapshots for long-term pattern analysis.</p>
-            </div>
+        <header className="header">
+        <div className="branding">
+            <h1 className="title">🧠 Equity Intelligence Dashboard</h1>
+            <p className="subtitle">Structured market snapshots for long-term pattern analysis.</p>
+        </div>
 
-            <div className="tickerPicker">
-                <label className="label">Ticker</label>
-                <select
-                value={ticker}
-                onChange={(e) => setTicker(e.target.value)}
-                className="select"
-                >
-                {TICKERS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                ))}
-                </select>
-            </div>
+        <div className="tickerPicker">
+            <label className="label">Ticker</label>
+            <select
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value)}
+            className="select"
+            >
+            {TICKERS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+            ))}
+            </select>
+        </div>
         </header>
 
         <div className="grid">

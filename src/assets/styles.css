@@ -77,19 +77,36 @@ html, body, #root {
 }
 
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 1rem 0;
-  background: rgba(5, 2, 13, 0.55);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  /* NOT sticky */
+  position: static;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
 .tickerPicker {
-  min-width: 180px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.4rem;
+  align-items: flex-end;
+  min-width: 180px;
+}
+
+.select {
+  width: 180px;          /* 👈 compact */
+  max-width: 180px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: #f4f0ff;
+  outline: none;
 }
 
 .label {
