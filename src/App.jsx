@@ -1,17 +1,31 @@
 
-import './App.css'
+
+import "./assets/styles.css";
 
 function App() {
-
-
   return (
-    <>
-    <div style={{ padding: "2rem", fontFamily: "system-ui" }}>
-      <h1>Equity Intelligence Dashboard</h1>
-      <p>Structured market snapshots for long-term pattern analysis.</p>
+    <div className="page">
+      <div className="container">
+        <h1 className="title">
+          🧠 Equity Intelligence Dashboard
+        </h1>
+
+        <p className="subtitle">
+          Structured market snapshots for long-term pattern analysis.
+        </p>
+
+        <div className="card">
+          <h2>Coming Next</h2>
+          <ul>
+            <li>📸 Snapshot Capture</li>
+            <li>📊 Momentum Windows</li>
+            <li>🔄 Delta Comparison</li>
+            <li>🤖 AI Summary</li>
+          </ul>
+        </div>
+      </div>
     </div>
-    </>
-  )
+  );
 }
 
-export default App
+export default App;
