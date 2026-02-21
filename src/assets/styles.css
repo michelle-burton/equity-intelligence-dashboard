@@ -75,3 +75,181 @@ html, body, #root {
     padding: 3rem 1rem;
   }
 }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.tickerPicker {
+  min-width: 180px;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  color: #b9b0ff;
+}
+
+.select {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  color: #f4f0ff;
+  outline: none;
+}
+
+.select:focus {
+  border-color: rgba(169, 140, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(169, 140, 255, 0.15);
+}
+
+.grid {
+  margin-top: 2.5rem;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.25rem;
+}
+
+.grid > .card:nth-child(1),
+.grid > .card:nth-child(2) {
+  grid-column: span 6;
+}
+
+.grid > .card:nth-child(3),
+.grid > .card:nth-child(4) {
+  grid-column: span 6;
+}
+
+@media (max-width: 900px) {
+  .grid > .card { grid-column: span 12; }
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cardTitle {
+  margin: 0;
+}
+
+.muted {
+  color: rgba(244, 240, 255, 0.65);
+}
+
+.small { font-size: 0.85rem; }
+
+.bigRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bigValue {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pill {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+}
+
+.metrics {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.metricLabel {
+  font-size: 0.8rem;
+  color: rgba(244, 240, 255, 0.6);
+}
+
+.metricValue {
+  margin-top: 0.2rem;
+  font-weight: 600;
+}
+
+.divider {
+  margin: 1.25rem 0 0.25rem;
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+}
+
+.deltaTable {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.deltaRow {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.deltaLabel { font-weight: 600; }
+.deltaVal { text-align: right; }
+
+.deltaUp { color: rgba(120, 255, 190, 0.95); }
+.deltaDown { color: rgba(255, 120, 160, 0.95); }
+.deltaFlat { color: rgba(244, 240, 255, 0.75); }
+
+.history {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.historyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.historyDate {
+  font-weight: 650;
+}
+
+.historyChips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.chip {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
