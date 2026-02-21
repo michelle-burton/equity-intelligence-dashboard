@@ -121,6 +121,7 @@ function App() {
     const [aiText, setAiText] = useState("");
     const [stored, setStored] = useState(() => loadStoredSnapshots());
     const [toast, setToast] = useState("");
+    const [baselineAsOf, setBaselineAsOf] = useState(null);
 
     // 1️⃣ base data (demo)
     const baseHistory = useMemo(() => SNAPSHOTS[ticker] ?? [], [ticker]);
@@ -141,7 +142,11 @@ function App() {
 
     // 4️⃣ NOW define latest & previous
     const latest = history[0];
-    const previous = history[1];
+    //const previous = history[1];
+    const previous = useMemo(() => {
+        if (!baselineAsOf) return history[1];
+        return history.find((s) => s.asOf === baselineAsOf) ?? history[1];
+        }, [baselineAsOf, history]);
 
     // 5️⃣ THEN define latestToShow
     //const latestToShow = liveLatest ?? latest; // if you have liveLatest, otherwise just use latest
@@ -156,69 +161,70 @@ function App() {
             <p className="subtitle">Structured market snapshots for long-term pattern analysis.</p>
         </div>
 
-<div className="controlPanel">
-  <div className="controlRow">
-    <div className="controlGroup">
-      <label className="label">Ticker</label>
-      <select
-        value={ticker}
-        onChange={(e) => {
-          setTicker(e.target.value);
-          setAiText("");
-         // setSelectedPrevious?.(null); // safe if you add clickable baseline later
-        }}
-        className="select selectSmall"
-      >
-        {TICKERS.map((t) => (
-          <option key={t} value={t}>{t}</option>
-        ))}
-      </select>
-    </div>
+        <div className="controlPanel">
+            <div className="controlRow">
+                <div className="controlGroup">
+                <label className="label">Ticker</label>
+                <select
+                    value={ticker}
+                    onChange={(e) => {
+                        setTicker(e.target.value);
+                        setBaselineAsOf(null);
+                        setAiText("");
+                    // setSelectedPrevious?.(null); // safe if you add clickable baseline later
+                    }}
+                    className="select selectSmall"
+                >
+                    {TICKERS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                    ))}
+                </select>
+                </div>
 
-    <div className="controlGroup">
-      <label className="label">Actions</label>
-      <div className="controlButtons">
-        <button
-          className="btn btnPrimary"
-          onClick={() => {
-            const current = latestToShow ?? latest; // use latestToShow if you have it
-            if (!current) return;
+                <div className="controlGroup">
+                <label className="label">Actions</label>
+                <div className="controlButtons">
+                    <button
+                    className="btn btnPrimary"
+                    onClick={() => {
+                        const current = latestToShow ?? latest; // use latestToShow if you have it
+                        if (!current) return;
 
-            const nextAll = { ...stored };
-            nextAll[ticker] = upsertSnapshot(nextAll[ticker], {
-              ...current,
-              source: current.source ?? "captured",
-            });
+                        const nextAll = { ...stored };
+                        nextAll[ticker] = upsertSnapshot(nextAll[ticker], {
+                        ...current,
+                        source: current.source ?? "captured",
+                        });
 
-            setStored(nextAll);
-              saveStoredSnapshots(nextAll);
-              
-            setToast(`✅ Captured ${ticker} • ${current.asOf}`);
-            window.setTimeout(() => setToast(""), 1800);
-          }}
-          disabled={!(latestToShow ?? latest)}
-        >
-          Capture
-        </button>
+                        setStored(nextAll);
+                        saveStoredSnapshots(nextAll);
+                        
+                        setToast(`✅ Captured ${ticker} • ${current.asOf}`);
+                        window.setTimeout(() => setToast(""), 1800);
+                    }}
+                    disabled={!(latestToShow ?? latest)}
+                    >
+                    Capture
+                    </button>
 
-        <button
-          className="btn btnGhost"
-          onClick={() => {
-            const nextAll = { ...stored, [ticker]: [] };
-            setStored(nextAll);
-            saveStoredSnapshots(nextAll);
-            setToast(`Cleared captures for ${ticker}`);
-            window.setTimeout(() => setToast(""), 1600);
-          }}
-        >
-          Clear
-        </button>
-      </div>
-    </div>
-  </div>
+                    <button
+                    className="btn btnGhost"
+                    onClick={() => {
+                        const nextAll = { ...stored, [ticker]: [] };
+                        setStored(nextAll);
+                        saveStoredSnapshots(nextAll);
+                        setToast(`Cleared captures for ${ticker}`);
+                        window.setTimeout(() => setToast(""), 1600);
+                    }}
+                    >
+                    Clear
+                    </button>
+                </div>
+                </div>
+            </div>
 
-  {toast ? <div className="toast">{toast}</div> : null}
-</div>
+            {toast ? <div className="toast">{toast}</div> : null}
+            </div>
         </header>
 
         <div className="grid">
@@ -226,7 +232,14 @@ function App() {
           <SnapshotCard title="Previous Snapshot" snapshot={previous} />
 
           <DeltaCard latest={latest} previous={previous} />
-          <HistoryCard history={history} />
+          <HistoryCard
+            history={history}
+            selectedAsOf={baselineAsOf}
+            onSelect={(asOf) => {
+                setBaselineAsOf(asOf);
+                setAiText("");
+            }}
+            />
 
           {/* ✅ ADD THIS */}
           <AiSummaryCard
@@ -320,7 +333,7 @@ function DeltaCard({ latest, previous }) {
 }
 
 
-function HistoryCard({ history }) {
+function HistoryCard({ history, selectedAsOf, onSelect }) {
   return (
     <div className="card">
       <div className="cardTop">
@@ -330,14 +343,20 @@ function HistoryCard({ history }) {
 
       <div className="historyCompact">
         {(history ?? []).map((s) => {
-          const trend = s?.windows?.m3; // <-- use 3 month trend
+          const isSelected = s.asOf === selectedAsOf;
+          const trend = s?.windows?.m3;
           const trendDir = typeof trend === "number" ? (trend >= 0 ? "up" : "down") : "flat";
           const arrow = trendDir === "up" ? "▲" : trendDir === "down" ? "▼" : "•";
 
           return (
-            <div key={s.asOf} className="historyLine">
+            <button
+              key={s.asOf}
+              type="button"
+              className={`historyLine ${isSelected ? "selected" : ""}`}
+              onClick={() => onSelect?.(s.asOf)}
+              title="Use as comparison baseline"
+            >
               <div className="historyDate">{s.asOf}</div>
-
               <div className="historyPrice">${s.price.toFixed(2)}</div>
 
               <div className={`historyTrend ${trendDir}`}>
@@ -345,7 +364,7 @@ function HistoryCard({ history }) {
                 <span className="labelSmall">3-mo trend</span>
                 <span className="trendValue">{formatPct(trend)}</span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
