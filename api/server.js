@@ -76,7 +76,7 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
     const dailyData = await avFetch({
       function: "TIME_SERIES_DAILY",
       symbol,
-      outputsize: "full",
+      outputsize: "compact",
     });
 
     const timeSeries = dailyData?.["Time Series (Daily)"];
