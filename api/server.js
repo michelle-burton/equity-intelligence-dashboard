@@ -74,7 +74,7 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
   try {
     // Single API call — daily adjusted gives us price + full history in one shot
     const dailyData = await avFetch({
-      function: "TIME_SERIES_DAILY_ADJUSTED",
+      function: "TIME_SERIES_DAILY",
       symbol,
       outputsize: "full",
     });
@@ -88,7 +88,7 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
     // Sort dates newest first
     const closes = Object.entries(timeSeries)
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([, v]) => parseFloat(v["5. adjusted close"]))
+      .map(([, v]) => parseFloat(v["4. close"]))
       .filter((c) => !isNaN(c));
 
     const price = closes[0];
