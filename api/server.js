@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import yahooFinance from "yahoo-finance2";
 
+// Suppress yahoo-finance2 validation notices that can interfere with requests
+yahooFinance.suppressNotices(["yahooSurvey", "ripHistorical"]);
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -48,6 +51,22 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+async function fetchWithRetry(fn, retries = 3, delayMs = 1500) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const is429 = err.message?.includes("Too Many Requests") || err.message?.includes("429");
+      if (is429 && i < retries - 1) {
+        console.log(`Yahoo 429 — retry ${i + 1}/${retries} after ${delayMs}ms`);
+        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 app.get("/api/snapshot/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
@@ -58,13 +77,17 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
     oneYearAgo.setDate(oneYearAgo.getDate() - 30);
 
     const [summary, historical] = await Promise.all([
-      yahooFinance.quoteSummary(symbol, {
-        modules: ["price", "summaryDetail", "defaultKeyStatistics"],
-      }),
-      yahooFinance.historical(symbol, {
-        period1: oneYearAgo.toISOString().slice(0, 10),
-        interval: "1d",
-      }),
+      fetchWithRetry(() =>
+        yahooFinance.quoteSummary(symbol, {
+          modules: ["price", "summaryDetail", "defaultKeyStatistics"],
+        })
+      ),
+      fetchWithRetry(() =>
+        yahooFinance.historical(symbol, {
+          period1: oneYearAgo.toISOString().slice(0, 10),
+          interval: "1d",
+        })
+      ),
     ]);
 
     const price = summary?.price?.regularMarketPrice ?? null;
