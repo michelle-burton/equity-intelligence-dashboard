@@ -1,12 +1,9 @@
 import express from "express";
 import cors from "cors";
-import yahooFinance from "yahoo-finance2";
-
-// Suppress yahoo-finance2 validation warnings
-yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const AV_KEY = process.env.ALPHA_VANTAGE_KEY;
 
 const ALLOWED_ORIGINS = [
   "https://equity-intelligence-dashboard.onrender.com",
@@ -17,7 +14,6 @@ const ALLOWED_ORIGINS = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, Render health checks)
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
@@ -35,87 +31,76 @@ function pctChange(current, past) {
 }
 
 function computeWindows(closes) {
+  // closes = array of numbers, newest first
   if (!closes || closes.length < 6) return { w1: null, m1: null, m3: null, m6: null, y1: null };
-  const last = closes[closes.length - 1];
-  const at = (n) => closes[closes.length - 1 - n];
+  const last = closes[0];
   return {
-    w1: pctChange(last, at(5)),
-    m1: pctChange(last, at(22)),
-    m3: pctChange(last, at(66)),
-    m6: pctChange(last, at(132)),
-    y1: pctChange(last, at(252)),
+    w1:  closes[5]   ? pctChange(last, closes[5])   : null,
+    m1:  closes[22]  ? pctChange(last, closes[22])  : null,
+    m3:  closes[66]  ? pctChange(last, closes[66])  : null,
+    m6:  closes[132] ? pctChange(last, closes[132]) : null,
+    y1:  closes[252] ? pctChange(last, closes[252]) : null,
   };
+}
+
+async function avFetch(params) {
+  const url = new URL("https://www.alphavantage.co/query");
+  url.searchParams.set("apikey", AV_KEY);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Alpha Vantage HTTP ${res.status}`);
+  return res.json();
 }
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-async function fetchWithRetry(fn, retries = 3, delayMs = 1500) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      const is429 = err.message?.includes("Too Many Requests") || err.message?.includes("429");
-      if (is429 && i < retries - 1) {
-        console.log(`Yahoo 429 — retry ${i + 1}/${retries} after ${delayMs}ms`);
-        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
-
 app.get("/api/snapshot/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
-  try {
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    // Add a small buffer so we reliably get 252 trading days
-    oneYearAgo.setDate(oneYearAgo.getDate() - 30);
+  if (!AV_KEY) {
+    return res.status(500).json({ error: "ALPHA_VANTAGE_KEY not set on server" });
+  }
 
-    const [summary, historical] = await Promise.all([
-      fetchWithRetry(() =>
-        yahooFinance.quoteSummary(symbol, {
-          modules: ["price", "summaryDetail", "defaultKeyStatistics"],
-        })
-      ),
-      fetchWithRetry(() =>
-        yahooFinance.historical(symbol, {
-          period1: oneYearAgo.toISOString().slice(0, 10),
-          interval: "1d",
-        })
-      ),
+  try {
+    // Fetch quote + daily history + overview in parallel
+    const [quoteData, dailyData, overviewData] = await Promise.all([
+      avFetch({ function: "GLOBAL_QUOTE", symbol }),
+      avFetch({ function: "TIME_SERIES_DAILY_ADJUSTED", symbol, outputsize: "full" }),
+      avFetch({ function: "OVERVIEW", symbol }),
     ]);
 
-    const price = summary?.price?.regularMarketPrice ?? null;
-    if (price === null) {
-      return res.status(502).json({ error: `No price data returned for ${symbol}` });
+    // --- Price ---
+    const price = parseFloat(quoteData?.["Global Quote"]?.["05. price"]);
+    if (!price || isNaN(price)) {
+      return res.status(502).json({ error: `No price returned for ${symbol}. Alpha Vantage may be rate-limiting (25 req/day on free tier).` });
     }
 
-    const closes = historical.map((d) => d.close).filter((c) => typeof c === "number");
+    // --- Historical closes (newest first) ---
+    const timeSeries = dailyData?.["Time Series (Daily)"] ?? {};
+    const closes = Object.entries(timeSeries)
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // newest first
+      .map(([, v]) => parseFloat(v["5. adjusted close"]))
+      .filter((c) => !isNaN(c));
+
     const windows = computeWindows(closes);
 
-    const marketCap = summary?.price?.marketCap;
-    const trailingPE = summary?.summaryDetail?.trailingPE ?? null;
-    const beta = summary?.summaryDetail?.beta ?? null;
-    const marketCapB =
-      typeof marketCap === "number"
-        ? parseFloat((marketCap / 1e9).toFixed(1))
-        : null;
+    // --- Fundamentals ---
+    const marketCapRaw = parseFloat(overviewData?.MarketCapitalization);
+    const peRaw = parseFloat(overviewData?.TrailingPE);
+    const betaRaw = parseFloat(overviewData?.Beta);
 
     const snapshot = {
       asOf: new Date().toISOString().slice(0, 10),
-      price: parseFloat(price.toFixed(2)),
+      price,
       windows,
       fundamentals: {
-        marketCapB,
-        pe: typeof trailingPE === "number" ? parseFloat(trailingPE.toFixed(1)) : null,
-        beta: typeof beta === "number" ? parseFloat(beta.toFixed(2)) : null,
+        marketCapB: !isNaN(marketCapRaw) ? parseFloat((marketCapRaw / 1e9).toFixed(1)) : null,
+        pe: !isNaN(peRaw) ? parseFloat(peRaw.toFixed(1)) : null,
+        beta: !isNaN(betaRaw) ? parseFloat(betaRaw.toFixed(2)) : null,
       },
-      source: "yahoo-finance2",
+      source: "alpha-vantage",
     };
 
     res.json(snapshot);
