@@ -72,41 +72,40 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
   }
 
   try {
-    // Fetch quote + daily history + overview in parallel
-    const [quoteData, dailyData, overviewData] = await Promise.all([
-      avFetch({ function: "GLOBAL_QUOTE", symbol }),
-      avFetch({ function: "TIME_SERIES_DAILY_ADJUSTED", symbol, outputsize: "full" }),
-      avFetch({ function: "OVERVIEW", symbol }),
-    ]);
+    // Single API call — daily adjusted gives us price + full history in one shot
+    const dailyData = await avFetch({
+      function: "TIME_SERIES_DAILY_ADJUSTED",
+      symbol,
+      outputsize: "full",
+    });
 
-    // --- Price ---
-    const price = parseFloat(quoteData?.["Global Quote"]?.["05. price"]);
-    if (!price || isNaN(price)) {
-      return res.status(502).json({ error: `No price returned for ${symbol}. Alpha Vantage may be rate-limiting (25 req/day on free tier).` });
+    const timeSeries = dailyData?.["Time Series (Daily)"];
+    if (!timeSeries) {
+      const info = dailyData?.Information || dailyData?.Note || JSON.stringify(dailyData);
+      return res.status(502).json({ error: `No data from Alpha Vantage: ${info}` });
     }
 
-    // --- Historical closes (newest first) ---
-    const timeSeries = dailyData?.["Time Series (Daily)"] ?? {};
+    // Sort dates newest first
     const closes = Object.entries(timeSeries)
-      .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // newest first
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
       .map(([, v]) => parseFloat(v["5. adjusted close"]))
       .filter((c) => !isNaN(c));
 
-    const windows = computeWindows(closes);
+    const price = closes[0];
+    if (!price) {
+      return res.status(502).json({ error: `No price data for ${symbol}` });
+    }
 
-    // --- Fundamentals ---
-    const marketCapRaw = parseFloat(overviewData?.MarketCapitalization);
-    const peRaw = parseFloat(overviewData?.TrailingPE);
-    const betaRaw = parseFloat(overviewData?.Beta);
+    const windows = computeWindows(closes);
 
     const snapshot = {
       asOf: new Date().toISOString().slice(0, 10),
-      price,
+      price: parseFloat(price.toFixed(2)),
       windows,
       fundamentals: {
-        marketCapB: !isNaN(marketCapRaw) ? parseFloat((marketCapRaw / 1e9).toFixed(1)) : null,
-        pe: !isNaN(peRaw) ? parseFloat(peRaw.toFixed(1)) : null,
-        beta: !isNaN(betaRaw) ? parseFloat(betaRaw.toFixed(2)) : null,
+        marketCapB: null,
+        pe: null,
+        beta: null,
       },
       source: "alpha-vantage",
     };
