@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import yahooFinance from "yahoo-finance2";
 
-// Suppress yahoo-finance2 validation notices that can interfere with requests
-yahooFinance.suppressNotices(["yahooSurvey", "ripHistorical"]);
+// Suppress yahoo-finance2 validation warnings
+yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
