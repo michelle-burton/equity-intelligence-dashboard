@@ -428,3 +428,11 @@ html, body, #root {
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.22);
 }
+
+/* P/E color classes */
+/* P/E color classes (apply on the VALUE span) */
+.metricValue.peGood      { color: rgba(90, 255, 170, 0.95); }     /* green */
+.metricValue.peElevated  { color: rgba(190, 255, 120, 0.95); }    /* green-yellow */
+.metricValue.peHigh      { color: rgba(255, 214, 90, 0.95); }     /* amber */
+.metricValue.peExtreme   { color: rgba(255, 92, 92, 0.95); }      /* red */
+.metricValue.peUnknown   { color: rgba(255, 255, 255, 0.75); }

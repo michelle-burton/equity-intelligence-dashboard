@@ -41,5 +41,15 @@ export const SNAPSHOTS = {
       windows: { w1: 1.6, m1: 11.4, m3: -4.0, m6: 3.9, y1: 91.3 },
       fundamentals: { marketCapB: 4340.0, pe: 93.2, beta: 1.64 }
     }
-  ]
+    ],
+  SPY: [
+    {
+        symbol: "SPY",
+        asOf: "2026-02-14",
+        price: 0,
+        windows: { w1: 0, m1: 0, m3: 0, m6: 0, y1: 0 },
+        fundamentals: { marketCapB: null, pe: null, beta: 1.0 },
+        source: "demo"
+    }
+    ]
 };

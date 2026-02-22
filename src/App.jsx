@@ -2,8 +2,10 @@
 import { useMemo, useState } from "react";
 import "./assets/styles.css";
 import { SNAPSHOTS } from "./data/snapshots";
+import { fetchYahooSnapshot } from "./lib/yahoo";
+import { captureSnapshotWithBenchmark } from "./lib/snapshotService";
 
-const TICKERS = ["HOOD", "AVGO", "NVDA"];
+const TICKERS = ["HOOD", "AVGO", "NVDA", "SPY"];
 
 
 function generateNarrative({ ticker, latest, previous }) {
@@ -116,12 +118,39 @@ function upsertSnapshot(list, snap) {
   return [snap, ...filtered].sort((a, b) => (a.asOf < b.asOf ? 1 : -1));
 }
 
+/* PE functions */
+function peBand(pe) {
+  if (typeof pe !== "number") return "peUnknown";
+  if (pe < 25) return "peGood";
+  if (pe < 40) return "peElevated";
+  if (pe < 70) return "peHigh";
+  return "peExtreme";
+}
+
+function relBand(rel) {
+  if (typeof rel !== "number") return "";
+  if (rel > 1) return "relUp";
+  if (rel < -1) return "relDown";
+  return "relFlat";
+}
+
+function formatRel(n) {
+  if (typeof n !== "number") return "—";
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+
 function App() {
+    //console.log(import.meta.env.VITE_FINNHUB_API_KEY);
+
     const [ticker, setTicker] = useState("HOOD");
     const [aiText, setAiText] = useState("");
     const [stored, setStored] = useState(() => loadStoredSnapshots());
     const [toast, setToast] = useState("");
     const [baselineAsOf, setBaselineAsOf] = useState(null);
+    const [liveLatest, setLiveLatest] = useState(null);
+    const [loadingLive, setLoadingLive] = useState(false);
 
     // 1️⃣ base data (demo)
     const baseHistory = useMemo(() => SNAPSHOTS[ticker] ?? [], [ticker]);
@@ -149,8 +178,36 @@ function App() {
         }, [baselineAsOf, history]);
 
     // 5️⃣ THEN define latestToShow
-    //const latestToShow = liveLatest ?? latest; // if you have liveLatest, otherwise just use latest
-    const latestToShow = latest;
+    const latestToShow = liveLatest ?? latest; // if you have liveLatest, otherwise just use latest
+    //const latestToShow = latest;
+
+    async function handleCapture() {
+        try {
+        const snap = liveLatest ?? latestToShow ?? latest;
+
+        if (!snap?.asOf) {
+            setToast("Nothing to capture yet.");
+            window.setTimeout(() => setToast(""), 1600);
+            return;
+        }
+
+        const nextList = upsertSnapshot(storedHistory, snap);
+        const nextAll = { ...stored, [ticker]: nextList };
+
+        setStored(nextAll);
+        saveStoredSnapshots(nextAll);
+
+        setToast(`Captured ${ticker} (${snap.asOf})`);
+        window.setTimeout(() => setToast(""), 1600);
+
+        // optional: reset baseline + AI summary so UI stays consistent
+        setBaselineAsOf(null);
+        setAiText("");
+        } catch (e) {
+        console.error("Capture failed:", e);
+        alert("Capture failed. Check console.");
+        }
+    }
 
   return (
     <div className="page">
@@ -184,54 +241,79 @@ function App() {
                 <div className="controlGroup">
                 <label className="label">Actions</label>
                 <div className="controlButtons">
-                    <button
-                    className="btn btnPrimary"
-                    onClick={() => {
-                        const current = latestToShow ?? latest; // use latestToShow if you have it
-                        if (!current) return;
+                   <button
+                        className="btn"
+                        disabled={loadingLive}
+                        onClick={async () => {
+                            try {
+                            setLoadingLive(true);
 
-                        const nextAll = { ...stored };
-                        nextAll[ticker] = upsertSnapshot(nextAll[ticker], {
-                        ...current,
-                        source: current.source ?? "captured",
-                        });
+                            const snapshot = await fetchYahooSnapshot(ticker);
 
-                        setStored(nextAll);
-                        saveStoredSnapshots(nextAll);
-                        
-                        setToast(`✅ Captured ${ticker} • ${current.asOf}`);
-                        window.setTimeout(() => setToast(""), 1800);
-                    }}
-                    disabled={!(latestToShow ?? latest)}
-                    >
-                    Capture
+                            setLiveLatest(snapshot);
+
+                            console.log("LIVE SNAPSHOT:", snapshot);
+                            } catch (err) {
+                            console.error("Finnhub error:", err);
+                            alert("Failed to fetch live data.");
+                            } finally {
+                            setLoadingLive(false);
+                            }
+                        }}
+                        >
+                        {loadingLive ? "Fetching..." : "Fetch Live"}
                     </button>
 
                     <button
-                    className="btn btnGhost"
-                    onClick={() => {
-                        const nextAll = { ...stored, [ticker]: [] };
-                        setStored(nextAll);
-                        saveStoredSnapshots(nextAll);
-                        setToast(`Cleared captures for ${ticker}`);
-                        window.setTimeout(() => setToast(""), 1600);
-                    }}
-                    >
-                    Clear
+                        className="btn btnGhost"
+                        onClick={() => {
+                            const nextAll = { ...stored, [ticker]: [] };
+                            setStored(nextAll);
+                            saveStoredSnapshots(nextAll);
+                            setToast(`Cleared captures for ${ticker}`);
+                            window.setTimeout(() => setToast(""), 1600);
+                        }}
+                        >
+                        Clear
                     </button>
+                                  
+                    <button
+                        className="btn"
+                        onClick={handleCapture}
+                        disabled={!latestToShow && !latest}
+                        >
+                        Capture
+                    </button>          
+                                  
+                    
+                                  
                 </div>
                 </div>
             </div>
 
             {toast ? <div className="toast">{toast}</div> : null}
-            </div>
+                  </div>
+                  
+                  {/* <button
+  onClick={async () => {
+    const res = await fetch(
+      `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${import.meta.env.VITE_FINNHUB_API_KEY}`
+    );
+    const data = await res.json();
+    console.log("QUOTE DATA:", data);
+  }}
+>
+  Test Finnhub Quote
+                  </button> */}
+                  
+
         </header>
 
         <div className="grid">
-          <SnapshotCard title="Latest Snapshot" snapshot={latest} />
+          <SnapshotCard title="Latest Snapshot" snapshot={latestToShow} />
           <SnapshotCard title="Previous Snapshot" snapshot={previous} />
 
-          <DeltaCard latest={latest} previous={previous} />
+          <DeltaCard latest={latestToShow} previous={previous} />
           <HistoryCard
             history={history}
             selectedAsOf={baselineAsOf}
@@ -240,11 +322,9 @@ function App() {
                 setAiText("");
             }}
             />
-
-          {/* ✅ ADD THIS */}
           <AiSummaryCard
             ticker={ticker}
-            latest={latest}
+            latest={latestToShow}
             previous={previous}
             aiText={aiText}
             onGenerate={() => setAiText(generateNarrative({ ticker, latest, previous }))}
@@ -255,6 +335,7 @@ function App() {
     </div>
   );
 }
+
 
 function SnapshotCard({ title, snapshot }) {
   return (
@@ -281,7 +362,7 @@ function SnapshotCard({ title, snapshot }) {
 
       <div className="metrics">
         <Metric label="Mkt Cap" value={snapshot?.fundamentals?.marketCapB ? `${snapshot.fundamentals.marketCapB}B` : "—"} />
-        <Metric label="P/E" value={snapshot?.fundamentals?.pe ?? "—"} />
+        <Metric label="P/E" value={snapshot?.fundamentals?.pe ?? "—"} valueClassName={peBand(Number(snapshot?.fundamentals?.pe))} />
         <Metric label="Beta" value={snapshot?.fundamentals?.beta ?? "—"} />
       </div>
     </div>
@@ -372,12 +453,12 @@ function HistoryCard({ history, selectedAsOf, onSelect }) {
   );
 }
 
-
-function Metric({ label, value }) {
+/* P/E change color  */
+function Metric({ label, value, className = "", valueClassName = "" }) {
   return (
-    <div className="metric">
+    <div className={`metric ${className}`}>
       <div className="metricLabel">{label}</div>
-      <div className="metricValue">{value}</div>
+      <div className={`metricValue ${valueClassName}`}>{value}</div>
     </div>
   );
 }
@@ -402,7 +483,10 @@ function AiSummaryCard({ ticker, latest, previous, aiText, onGenerate, onClear }
       </div>
 
       <pre className="aiBox">
-        {aiText || `Click “Generate Summary” to interpret ${ticker} (${previous?.asOf ?? "—"} → ${latest?.asOf ?? "—"}).`}
+        {aiText ||
+          `Click “Generate Summary” to interpret ${ticker} (${previous?.asOf ?? "—"} → ${
+            latest?.asOf ?? "—"
+          }).`}
       </pre>
     </div>
   );
