@@ -56,6 +56,14 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Temporary debug route — remove after confirming AV key works
+app.get("/debug/:symbol", async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  if (!AV_KEY) return res.status(500).json({ error: "No key" });
+  const data = await avFetch({ function: "GLOBAL_QUOTE", symbol });
+  res.json(data);
+});
+
 app.get("/api/snapshot/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
