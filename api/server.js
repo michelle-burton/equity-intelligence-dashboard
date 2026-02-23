@@ -1,9 +1,11 @@
 import express from "express";
 import cors from "cors";
+import OpenAI from "openai";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const AV_KEY = process.env.ALPHA_VANTAGE_KEY;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const ALLOWED_ORIGINS = [
   "https://equity-intelligence-dashboard.onrender.com",
@@ -113,6 +115,49 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
     res.json(snapshot);
   } catch (err) {
     console.error(`[/api/snapshot/${symbol}] Error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/summary", async (req, res) => {
+  const { ticker, latest, previous } = req.body;
+
+  if (!latest || !previous) {
+    return res.status(400).json({ error: "Need both latest and previous snapshots" });
+  }
+
+  const fmt = (n) => (typeof n === "number" ? `${n > 0 ? "+" : ""}${n.toFixed(1)}%` : "—");
+
+  const prompt = `You are a concise equity analyst. Interpret this market snapshot comparison for ${ticker} and give a 4-6 sentence narrative. Focus on momentum shifts, what the short-term vs medium-term trends suggest, and any notable risk signals. Be direct and specific — no fluff.
+
+Ticker: ${ticker}
+Date range: ${previous.asOf} → ${latest.asOf}
+
+LATEST:
+  Price: $${latest.price}
+  1W: ${fmt(latest.windows?.w1)}  1M: ${fmt(latest.windows?.m1)}  3M: ${fmt(latest.windows?.m3)}
+
+PREVIOUS:
+  Price: $${previous.price}
+  1W: ${fmt(previous.windows?.w1)}  1M: ${fmt(previous.windows?.m1)}  3M: ${fmt(previous.windows?.m3)}
+
+CHANGES since last snapshot:
+  Price: ${latest.price > previous.price ? "+" : ""}$${(latest.price - previous.price).toFixed(2)}
+  1W shift: ${fmt(latest.windows?.w1 - previous.windows?.w1)}
+  1M shift: ${fmt(latest.windows?.m1 - previous.windows?.m1)}
+  3M shift: ${fmt(latest.windows?.m3 - previous.windows?.m3)}`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 300,
+    });
+
+    const summary = completion.choices[0].message.content;
+    res.json({ summary });
+  } catch (err) {
+    console.error("[/api/summary] OpenAI error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });

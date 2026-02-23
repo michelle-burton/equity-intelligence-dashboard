@@ -151,6 +151,7 @@ function App() {
     const [baselineAsOf, setBaselineAsOf] = useState(null);
     const [liveLatest, setLiveLatest] = useState(null);
     const [loadingLive, setLoadingLive] = useState(false);
+    const [loadingSummary, setLoadingSummary] = useState(false);
 
     // 1️⃣ base data (demo)
     const baseHistory = useMemo(() => SNAPSHOTS[ticker] ?? [], [ticker]);
@@ -327,7 +328,25 @@ function App() {
             latest={latestToShow}
             previous={previous}
             aiText={aiText}
-            onGenerate={() => setAiText(generateNarrative({ ticker, latest, previous }))}
+            loadingSummary={loadingSummary}
+            onGenerate={async () => {
+              try {
+                setLoadingSummary(true);
+                setAiText("Generating...");
+                const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+                const res = await fetch(`${API_URL}/api/summary`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ticker, latest: latestToShow, previous }),
+                });
+                const data = await res.json();
+                setAiText(data.summary || data.error || "No response.");
+              } catch (err) {
+                setAiText("Failed to generate summary. Try again.");
+              } finally {
+                setLoadingSummary(false);
+              }
+            }}
             onClear={() => setAiText("")}
           />
         </div>
@@ -463,8 +482,8 @@ function Metric({ label, value, className = "", valueClassName = "" }) {
   );
 }
 
-function AiSummaryCard({ ticker, latest, previous, aiText, onGenerate, onClear }) {
-  const disabled = !latest || !previous;
+function AiSummaryCard({ ticker, latest, previous, aiText, onGenerate, onClear, loadingSummary }) {
+  const disabled = !latest || !previous || loadingSummary;
 
   return (
     <div className="card aiCard">
@@ -475,7 +494,7 @@ function AiSummaryCard({ ticker, latest, previous, aiText, onGenerate, onClear }
 
       <div className="aiActions">
         <button className="btn" onClick={onGenerate} disabled={disabled}>
-          Generate Summary
+          {loadingSummary ? "Generating..." : "Generate Summary"}
         </button>
         <button className="btn btnGhost" onClick={onClear} disabled={!aiText}>
           Clear
