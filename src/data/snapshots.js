@@ -5,7 +5,7 @@ export const SNAPSHOTS = {
       asOf: "2026-02-14",
       price: 75.97,
       windows: { w1: -6.1, m1: -13.3, m3: -33.5, m6: -3.4, y1: 72.2 },
-      fundamentals: { marketCapB: 64.1, pe: 32.4, beta: 2.44 }
+      fundamentals: { marketCapB: 68.1, pe: 32.4, beta: 2.44 }
     },
     {
       asOf: "2026-01-31",
@@ -46,9 +46,9 @@ export const SNAPSHOTS = {
     {
         symbol: "SPY",
         asOf: "2026-02-14",
-        price: 0,
-        windows: { w1: 0, m1: 0, m3: 0, m6: 0, y1: 0 },
-        fundamentals: { marketCapB: null, pe: null, beta: 1.0 },
+        price: 689.43,
+        windows: { w1: 1.20, m1: 1.75, m3: 5.65, m6: 8.04, y1: 12.95},
+        fundamentals: { marketCapB: 689.4, pe: 24.43, beta: 1.0 },
         source: "demo"
     }
     ]
