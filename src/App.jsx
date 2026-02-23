@@ -251,7 +251,14 @@ function App() {
 
                             const snapshot = await fetchYahooSnapshot(ticker);
 
-                            setLiveLatest(snapshot);
+                            const spyM1 = SNAPSHOTS.SPY?.[0]?.windows?.m1;
+                            const stockM1 = snapshot?.windows?.m1;
+                            const vsSpy =
+                              typeof stockM1 === "number" && typeof spyM1 === "number"
+                                ? { m1: +(stockM1 - spyM1).toFixed(2) }
+                                : undefined;
+
+                            setLiveLatest({ ...snapshot, ...(vsSpy ? { vsSpy } : {}) });
 
                             console.log("LIVE SNAPSHOT:", snapshot);
                             } catch (err) {

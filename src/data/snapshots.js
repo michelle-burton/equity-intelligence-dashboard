@@ -5,7 +5,8 @@ export const SNAPSHOTS = {
       asOf: "2026-02-14",
       price: 75.97,
       windows: { w1: -6.1, m1: -13.3, m3: -33.5, m6: -3.4, y1: 72.2 },
-      fundamentals: { marketCapB: 68.1, pe: 32.4, beta: 2.44 }
+      fundamentals: { marketCapB: 68.1, pe: 32.4, beta: 2.44 },
+      vsSpy: { m1: -15.05 }
     },
     {
       asOf: "2026-01-31",
@@ -19,7 +20,8 @@ export const SNAPSHOTS = {
       asOf: "2026-02-14",
       price: 231.30,
       windows: { w1: -2.6, m1: -4.5, m3: -10.4, m6: 13.8, y1: 49.7 },
-      fundamentals: { marketCapB: 1568.1, pe: 36.2, beta: 1.05 }
+      fundamentals: { marketCapB: 1568.1, pe: 36.2, beta: 1.05 },
+      vsSpy: { m1: -6.25 }
     },
     {
       asOf: "2026-01-31",
@@ -33,7 +35,8 @@ export const SNAPSHOTS = {
       asOf: "2026-02-14",
       price: 182.80,
       windows: { w1: -0.4, m1: 1.1, m3: -5.7, m6: 7.5, y1: 59.2 },
-      fundamentals: { marketCapB: 4672.8, pe: 96.6, beta: 1.65 }
+      fundamentals: { marketCapB: 4672.8, pe: 96.6, beta: 1.65 },
+      vsSpy: { m1: -0.65 }
     },
     {
       asOf: "2026-01-31",
