@@ -356,6 +356,20 @@ function App() {
 }
 
 
+function SpyPill({ vsSpy }) {
+  const val = vsSpy?.m1;
+  if (typeof val !== "number") return null;
+  const ahead = val >= 0;
+  const arrow = ahead ? "▲" : "▼";
+  const cls = ahead ? "ahead" : "behind";
+  const sign = ahead ? "+" : "";
+  return (
+    <div className={`spyPill ${cls}`}>
+      {arrow} vs SPY {sign}{val.toFixed(1)}% (1M)
+    </div>
+  );
+}
+
 function SnapshotCard({ title, snapshot }) {
   return (
     <div className="card">
@@ -368,6 +382,8 @@ function SnapshotCard({ title, snapshot }) {
         <div className="bigValue">${snapshot?.price?.toFixed?.(2) ?? "—"}</div>
         <div className="pill">{snapshot ? "Snapshot" : "No data"}</div>
       </div>
+
+      <SpyPill vsSpy={snapshot?.vsSpy} />
 
       <div className="metrics">
         <Metric label="1W" value={formatPct(snapshot?.windows?.w1)} />

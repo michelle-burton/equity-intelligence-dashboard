@@ -45,6 +45,27 @@ function computeWindows(closes) {
   };
 }
 
+// In-memory SPY cache — fetched once per server session
+let spyCache = null;
+
+async function getSpyWindows() {
+  if (spyCache) return spyCache;
+  try {
+    const data = await avFetch({ function: "TIME_SERIES_DAILY", symbol: "SPY", outputsize: "compact" });
+    const timeSeries = data?.["Time Series (Daily)"];
+    if (!timeSeries) return null;
+    const closes = Object.entries(timeSeries)
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([, v]) => parseFloat(v["4. close"]))
+      .filter((c) => !isNaN(c));
+    spyCache = computeWindows(closes);
+    console.log("SPY cached:", spyCache);
+  } catch (e) {
+    console.warn("SPY cache failed:", e.message);
+  }
+  return spyCache;
+}
+
 async function avFetch(params) {
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("apikey", AV_KEY);
@@ -100,10 +121,21 @@ app.get("/api/snapshot/:symbol", async (req, res) => {
 
     const windows = computeWindows(closes);
 
+    // Get SPY from cache (free — no extra API call after first fetch)
+    const spyWindows = symbol === "SPY" ? windows : await getSpyWindows();
+    const vsSpy = {};
+    for (const k of ["w1", "m1", "m3"]) {
+      const s = windows[k], spy = spyWindows?.[k];
+      vsSpy[k] = typeof s === "number" && typeof spy === "number"
+        ? parseFloat((s - spy).toFixed(2))
+        : null;
+    }
+
     const snapshot = {
       asOf: new Date().toISOString().slice(0, 10),
       price: parseFloat(price.toFixed(2)),
       windows,
+      vsSpy,
       fundamentals: {
         marketCapB: null,
         pe: null,
